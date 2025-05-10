@@ -5,6 +5,7 @@ const router = express.Router()
 
 router.get('/', controller.getCategories)
 router.get('/:id', controller.getCategory)
+router.get('/:id/products', controller.getProductsByCategory)
 router.post('/', controller.createCategory)
 router.delete('/:id', controller.deleteCategory)
 router.put('/:id', controller.updateCategory)

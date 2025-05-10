@@ -12,11 +12,6 @@ export const getCategoryById = (id) => {
   return prisma.category.findUnique({ where: { id } })
 }
 
-export const getCategoryByName = (name) => {
-  return prisma.category.findUnique({ where: { name } })
-}
-
-
 export const deleteCategory = (id) => {
   if (!ObjectId.isValid(id)) {
     throw new Error('Invalid ObjectId format for Category ID')
@@ -29,4 +24,11 @@ export const updateCategory = (id, data) => {
     throw new Error('Invalid ObjectId format for Category ID')
   }
   return prisma.category.update({ where: { id }, data })
+}
+
+export const getProductsByCategory = (id) => {
+  if (!ObjectId.isValid(id)) {
+    throw new Error('Invalid ObjectId format for Category ID')
+  }
+  return prisma.product.findMany({ where: { categoryId: id } })
 }
