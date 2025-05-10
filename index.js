@@ -18,6 +18,7 @@ app.use(express.json());
 
 
 app.use(allRoutes)
+app.use('/uploads', express.static('uploads'));
 
 ;(async () => {
     try {
