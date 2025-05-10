@@ -3,19 +3,25 @@ import dotenv from "dotenv"
 import cors from "cors";
 import mongoose from "mongoose"
 import cookieParser from "cookie-parser";
+import allRoutes from './routes/allRoutes.js'
+
+
+
 
 dotenv.config()
-const PORT = process.env.PORT || 0
+const PORT = process.env.PORT || 3000 
 
 const app = express();
-app.use(express.json());
+app.use(cors());
+app.use(cookieParser()); 
+app.use(express.json()); 
 
 
+app.use(allRoutes)
 
-(async () => {
+;(async () => {
     try {
-        // Connect to MongoDB via Mongoose
-        await mongoose.connect(process.env.MONGO_URI);
+        await mongoose.connect(process.env.DATABASE_URL);
         console.log("Connected to Mongo database ✅");
         app.listen(PORT, () => {
             console.log(`Server running on http://localhost:${PORT} ✅`)
@@ -25,5 +31,3 @@ app.use(express.json());
         process.exit(1);
     }
 })()
-
-
