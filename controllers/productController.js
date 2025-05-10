@@ -38,8 +38,8 @@ export const updateProduct = async (req, res) => {
       ...productData,
       variants: variants
         ? {
-            deleteMany: {}, // ลบ variant เดิมทั้งหมด
-            create: variants, // เพิ่ม variant ใหม่
+            deleteMany: {},
+            create: variants,
           }
         : undefined,
     });

@@ -9,12 +9,12 @@ import allRoutes from './routes/allRoutes.js'
 
 
 dotenv.config()
-const PORT = process.env.PORT || 3000  // ✅ แก้ค่า default port
+const PORT = process.env.PORT || 3000 
 
 const app = express();
-app.use(cors());              // ✅ เพิ่ม CORS
-app.use(cookieParser());      // ✅ เพิ่ม cookieParser
-app.use(express.json());      // ✅ รองรับ JSON body
+app.use(cors());
+app.use(cookieParser()); 
+app.use(express.json()); 
 
 
 app.use(allRoutes)

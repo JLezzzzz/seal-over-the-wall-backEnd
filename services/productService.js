@@ -21,7 +21,7 @@ export const getProductById = (id) =>
     return prisma.product.create({
       data: {
         ...productData,
-        productType, // ต้องรวมเข้ามา
+        productType,
         category: {
           connectOrCreate: {
             where: { name: productType },
@@ -47,12 +47,11 @@ export const getProductById = (id) =>
     });
 
 export const deleteProduct = async (id) => {
-  // ลบ variants ก่อน
+
   await prisma.variant.deleteMany({
     where: { productId: id },
   });
 
-  // แล้วลบ product
   return prisma.product.delete({
     where: { id },
   });
