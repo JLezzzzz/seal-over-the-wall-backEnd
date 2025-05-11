@@ -23,5 +23,6 @@
     "jsonwebtoken": "^9.0.2",
     "limiter": "^3.0.0",
     "mongoose": "^8.14.1"
+
   }
 }
