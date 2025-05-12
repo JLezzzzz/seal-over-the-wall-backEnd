@@ -53,9 +53,9 @@ router.post("/", async (req, res) => {
 });
 
 //-------------------------------Get a cart--------------------------------------
-router.get("/:cartId", async (req, res) => {
-  const { cartId } = req.params;
-  if (!cartId) {
+router.get("/:userId", async (req, res) => {
+  const { userId } = req.params;
+  if (!userId) {
     return res.status(400).json({
       error: true,
       message: "The information is not fulfilled",
@@ -63,7 +63,7 @@ router.get("/:cartId", async (req, res) => {
   }
 
   try {
-    const existCart = await Cart.findById(cartId);
+    const existCart = await Cart.findOne({ userId: userId });
     if (!existCart) {
       return res.status(404).json({
         error: true,
@@ -118,8 +118,12 @@ router.post("/:cartId/items", async (req, res) => {
       });
     }
 
-    // Create new item
-    const newItem = {
+    // create new obj.Id for user CartItem and _id item in cart
+    const newItemId = new mongoose.Types.ObjectId();
+
+    // create item for push into cart.items use new _id ที่ createจากข้างบน
+    const newItemInCart = {
+      _id: newItemId,
       cartId: cart._id,
       productId: new mongoose.Types.ObjectId(productId),
       quantity,
@@ -130,7 +134,22 @@ router.post("/:cartId/items", async (req, res) => {
     };
 
     // Update item in cart
-    cart.items.push(newItem);
+    cart.items.push(newItemInCart);
+
+    // create CartItem
+    const cartItem = new CartItem({
+      _id: newItemId,
+      cartId: cart._id,
+      productId: new mongoose.Types.ObjectId(productId),
+      quantity,
+      unitPrice,
+      selectedSize,
+      selectedColor,
+      selectedImage,
+    });
+
+    // save CartItem
+    await cartItem.save();
 
     // update total and updatedAt
     cart.total += quantity * unitPrice;
@@ -145,6 +164,8 @@ router.post("/:cartId/items", async (req, res) => {
       message: "Item added to cart successfully",
     });
   } catch (err) {
+    console.error("Error adding item to cart:", err);
+    console.error("Error stack:", err.stack);
     return res.status(500).json({
       error: true,
       message: "Server error",
@@ -155,9 +176,9 @@ router.post("/:cartId/items", async (req, res) => {
 
 //-------------------------------Delete an cart-item and update cart total price-------------------------------
 //Add the cartId to find the cart first, and then find the item within that cart.
-router.delete("/:cartId/items/:itemId", async (req, res) => {
+router.delete("/:cartId/item/:itemId", async (req, res) => {
   const { cartId, itemId } = req.params;
-  console.log(`cartId: ${cartId}, itemId: ${itemId}`);
+  // console.log(`userId: ${userId}, itemId: ${itemId}`);
 
   try {
     // check that the cart exists
@@ -166,9 +187,13 @@ router.delete("/:cartId/items/:itemId", async (req, res) => {
       return res.status(404).json({ error: true, message: "Cart not found" });
     }
 
+    console.log(cart)
+
     const embeddedItemIndex = cart.items.findIndex(
       (item) => item._id.toString() === itemId
     );
+
+    console.log(embeddedItemIndex)
 
     if (embeddedItemIndex >= 0) {
       // Store the price of that item first; if you delete it, you won't know its price
@@ -215,7 +240,8 @@ router.get("/populated/:userId", async (req, res) => {
       return res.status(404).json({ message: "Cart not found" });
     }
 
-    res.status(200).json(cart);
+
+    res.status(200).json({error:false,cart});
   } catch (error) {
     console.error("Error in /populated/:userId route:", error);
     res
@@ -371,6 +397,104 @@ router.patch("/:cartId/items/:itemId/quantity", async (req, res) => {
       cart,
       item,
       message: "Item quantity updated successfully",
+    });
+  } catch (err) {
+    return res.status(500).json({
+      error: true,
+      message: "Server error",
+      details: err.message,
+    });
+  }
+});
+
+// -------------------------------Update cart item details by itenId (color, size, quantity)-------------------------------
+router.patch("/items/:itemId", async (req, res) => {
+  const { itemId } = req.params;
+  const { selectedColor, selectedSize, quantity } = req.body;
+
+  try {
+    // Find CartItem by itemId
+    const cartItem = await CartItem.findById(itemId);
+    if (!cartItem) {
+      return res.status(404).json({
+        error: true,
+        message: "Cart item not found",
+      });
+    }
+
+    // Get cartId from the CartItem
+    const cartId = cartItem.cartId;
+
+    // Find Cart
+    const cart = await Cart.findById(cartId);
+    if (!cart) {
+      return res.status(404).json({
+        error: true,
+        message: "Cart not found",
+      });
+    }
+
+    // Find item within the cart's items array
+    const item = cart.items.id(itemId);
+    if (!item) {
+      return res.status(404).json({
+        error: true,
+        message: "Item not found in cart",
+      });
+    }
+
+    let isUpdated = false;
+
+    if (selectedColor !== undefined) {
+      item.selectedColor = selectedColor;
+      cartItem.selectedColor = selectedColor;
+      isUpdated = true;
+    }
+
+    if (selectedSize !== undefined) {
+      item.selectedSize = selectedSize;
+      cartItem.selectedSize = selectedSize;
+      isUpdated = true;
+    }
+
+    if (quantity !== undefined) {
+      if (quantity <= 0) {
+        return res.status(400).json({
+          error: true,
+          message: "Valid quantity is required (must be greater than 0)",
+        });
+      }
+
+      const oldTotal = item.quantity * item.unitPrice;
+      item.quantity = quantity;
+      cartItem.quantity = quantity;
+
+      const newTotal = item.quantity * item.unitPrice;
+      cartItem.totalPrice = newTotal; // Update totalPrice in CartItem
+      cart.total = cart.total - oldTotal + newTotal;
+      isUpdated = true;
+    }
+
+    if (!isUpdated) {
+      return res.status(400).json({
+        error: true,
+        message:
+          "No valid update parameters provided (selectedColor, selectedSize, or quantity)",
+      });
+    }
+
+    // save cartItem
+    await cartItem.save();
+    cart.updatedAt = new Date();
+
+    // save cart
+    await cart.save();
+
+    return res.status(200).json({
+      error: false,
+      cart,
+      item,
+      message: "Item details updated successfully",
     });
   } catch (err) {
     return res.status(500).json({

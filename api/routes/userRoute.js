@@ -1,15 +1,19 @@
 // import { User, Address, Creator } from "../../models/User.js";
 import express from "express";
-import { authUser } from "../../middlewares/auth.js";
-import { User } from "../../models/User.js";
+import { User} from "../../models/User.js";
+import { Order } from "../../models/Order.js";
 import { verify } from "../../middlewares/verify.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 
 const router = express.Router();
 
-router.post("/register", authUser, async (req, res) => {
-  const { firstName, email, password, phoneNumber, userName, lastName, addresses } = req.body;
+//SignUp
+router.post("/signUp", async (req, res) => {
+  const { firstName, email, password, phoneNumber, userName, lastName, addresses = [] } = req.body;
+  if (!firstName || !lastName || !email ||  !password ||  !phoneNumber ||  !userName) {
+    return res.status(400).json({ error: true, message: "All fields are required." });
+  }
 
   try {
     const existingUser = await User.findOne({ email });
@@ -39,10 +43,9 @@ router.post("/register", authUser, async (req, res) => {
   }
 });
 
-//Sign-in
-
-router.post("/sign-in", async (req, res) => {
-  const { email, password } = req.body;
+//Signin
+router.post("/signIn", async (req, res) => {
+  const {email, password} = req.body;
   if (!email || !password) {
     return res
       .status(400)
@@ -90,40 +93,97 @@ router.post("/sign-in", async (req, res) => {
 });
 
 // Add New Address
-
-router.post("/new-address", verify, async (req, res) => {
-  const { address, specific, subDistrict, district, city, postal, isDefault } =
+router.post("/address/:userId/:orderId", verify, async (req, res) => {
+  const {firstName,lastName,address, specific, subDistrict, district, city, postal, email, phone, smsPromotion = false,emailPromotion = false } = req;
     req.body;
+  const {userId, orderId} = req.params
 
-  if (!address || !specific || !subDistrict || !district || !city || !postal) {
+  if (!firstName || !lastName || !address || !specific || !subDistrict || !district || !city || !postal || !email || !phone || !smsPromotion || !emailPromotion) {
     return res
       .status(400)
       .json({ error: true, message: "Missing address fields" });
   }
 
   try {
-    const user = await User.findById(req.user.userId);
+    const user = await User.findById({ userId: userId });
     if (!user) {
       return res.status(404).json({ error: true, message: "User not found" });
     }
 
-    user.addresses.push({
-      address,
-      specific,
-      subDistrict,
-      district,
-      city,
-      postal,
-      isDefault: isDefault || false,
-    });
+    const order = await Order.findById({ orderId: orderId });
+    if (!order) {
+      return res.status(404).json({ error: true, message: "Order not found" });
+    }
 
-    await user.save();
+    user.addresses.push({
+      order, firstName,lastName,address, specific, subDistrict, district, city, postal, email, phone, smsPromotion,emailPromotion
+    });
 
     res.status(201).json({
       success: true,
       message: "Address added successfully",
       addresses: user.addresses,
     });
+    } catch (err) {
+    res
+      .status(500)
+      .json({ error: true, message: "Server error", details: err.message });
+  }
+});
+
+
+//Signin with cookies
+router.post("cookie/signIn", async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res
+      .status(400)
+      .json({ error: true, message: "Email and password are required" });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res
+        .status(401)
+        .json({ error: true, message: "Invalid credentials" });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res
+        .status(401)
+        .json({ error: true, message: "Incorrect password" });
+    }
+
+    // Generate JWT
+    const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "12h", // 12 hour expiration
+    });
+
+    const isProd = process.env.NODE_ENV === "production";
+
+    // Set token in HttpOnly cookie
+    res.cookie("accessToken", token, {
+      httpOnly: true,
+      secure: isProd, // only send over HTTPS in prod
+      sameSite: isProd ? "none" : "lax",
+      path: "/",
+      maxAge: 720 * 60 * 1000, // 12 hour
+    });
+
+    res.status(200).json({
+      error: false,
+      message: "Login successful",
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        fullName: user.fullName,
+    }}), // send some safe public info if needed
+    await user.save();
+
   } catch (err) {
     res
       .status(500)
@@ -132,78 +192,14 @@ router.post("/new-address", verify, async (req, res) => {
 });
 
 
-// ─── Creator Profile Management
-
-// Create or upgrade to creator
-router.post("/creator", verify, async (req, res) => {
-  const { creatorName, creatorBio, ig, fb, x } = req.body;
-  if (!creatorName || !creatorBio) {
-    return res.status(400).json({ error: true, message: "creatorName and creatorBio are required." });
-  }
-
-  try {
-    const user = await User.findById(req.user.userId);
-    if (!user) return res.status(404).json({ error: true, message: "User not found." });
-    if (user.isCreator) return res.status(400).json({ error: true, message: "Already a creator." });
-
-    user.isCreator = true;
-    user.creatorInfo = { userId: user._id, creatorName, creatorBio, ig, fb, x };
-    await user.save();
-
-    res.status(201).json({ success: true, message: "Creator profile created.", creatorInfo: user.creatorInfo });
-  } catch (err) {
-    res.status(500).json({ error: true, message: "Server error", details: err.message });
-  }
+//Signout to clear cookies
+router.post("/auth/logout", (req, res) => {
+  res.clearCookie("accessToken", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Strict",
+  });
+  res.status(200).json({ message: "Logged out successfully" });
 });
-
-// Get creator profile
-router.get("/creator", verify, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.userId).select('isCreator creatorInfo');
-    if (!user || !user.isCreator) {
-      return res.status(404).json({ error: true, message: "Creator profile not found." });
-    }
-    res.json({ success: true, creatorInfo: user.creatorInfo });
-  } catch (err) {
-    res.status(500).json({ error: true, message: "Server error", details: err.message });
-  }
-});
-
-// Update creator profile
-router.put("/creator", verify, async (req, res) => {
-  const updates = req.body;
-  try {
-    const user = await User.findById(req.user.userId);
-    if (!user || !user.isCreator) {
-      return res.status(404).json({ error: true, message: "Creator profile not found." });
-    }
-
-    Object.assign(user.creatorInfo, updates);
-    await user.save();
-
-    res.json({ success: true, message: "Creator profile updated.", creatorInfo: user.creatorInfo });
-  } catch (err) {
-    res.status(500).json({ error: true, message: "Server error", details: err.message });
-  }
-});
-
-// Delete creator profile
-router.delete("/creator", verify, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.userId);
-    if (!user || !user.isCreator) {
-      return res.status(404).json({ error: true, message: "Creator profile not found." });
-    }
-
-    user.isCreator = false;
-    user.creatorInfo = undefined;
-    await user.save();
-
-    res.status(204).send();
-  } catch (err) {
-    res.status(500).json({ error: true, message: "Server error", details: err.message });
-  }
-});
-
 
 export default router;
