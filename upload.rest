@@ -1,0 +1,17 @@
+### Upload
+
+POST http://localhost:3000/design/upload
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2ODFkZTcyYWIxYmFkMjg2MWE4YzU5ZTciLCJlbWFpbCI6InNjaEBleGFtcGxlLmNvbSIsImlhdCI6MTc0Njk3NzI5OCwiZXhwIjoxNzQ3NTgyMDk4fQ.Y3I4SVV46mZeSZ4Q-_f0orQ5UGH8G5qYjPeBEFNCc-0
+Content-Type: application/json
+
+{
+  "title": "Galaxy T-Shirt2",
+  "description": "A design inspired by outer space.",
+  "tags": ["space", "galaxy", "stars"],
+  "images": [
+    "https://res.cloudinary.com/dvpnipb6g/image/upload/v1746890249/llpnt9imf3h4o"
+  ],
+  "productType": "tshirt"
+}
+
+

@@ -1,5 +1,5 @@
 ### REGISTER
-POST http://localhost:6000/user/sign-up
+POST http://localhost:3000/user/sign-up
 Content-Type: application/json
 
 {
@@ -23,7 +23,7 @@ Content-Type: application/json
 }
 
 ### SIGN-IN
-POST http://localhost:6000/user/sign-in
+POST http://localhost:3000/user/sign-in
 Content-Type: application/json
 
 {
